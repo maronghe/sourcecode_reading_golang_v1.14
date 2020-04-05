@@ -937,6 +937,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 			// This G is in debt. Assist the GC to correct
 			// this before allocating. This must happen
 			// before disabling preemption.
+			// 协助GC进行，禁用之前的抢占
 			gcAssistAlloc(assistG)
 		}
 	}

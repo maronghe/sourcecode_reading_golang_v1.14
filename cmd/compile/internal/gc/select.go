@@ -111,6 +111,7 @@ func walkselectcases(cases *Nodes) []*Node {
 
 	// optimization: zero-case select
 	if n == 0 {
+		// nocase 翻译成 block -> gopark forever
 		return []*Node{mkcall("block", nil, nil)}
 	}
 
@@ -336,7 +337,7 @@ func walkselectcases(cases *Nodes) []*Node {
 	recvOK := temp(types.Types[TBOOL])
 	r = nod(OAS2, nil, nil)
 	r.List.Set2(chosen, recvOK)
-	fn := syslook("selectgo")
+	fn := syslook("selectgo") // 封装case，最终调用
 	r.Rlist.Set1(mkcall1(fn, fn.Type.Results(), nil, bytePtrToIndex(selv, 0), bytePtrToIndex(order, 0), nodintconst(int64(n))))
 	r = typecheck(r, ctxStmt)
 	init = append(init, r)

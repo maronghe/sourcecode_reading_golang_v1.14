@@ -1282,7 +1282,7 @@ func gcStart(trigger gcTrigger) {
 			throw("p mcache not flushed")
 		}
 	}
-
+	// ??
 	gcBgMarkStartWorkers()
 
 	systemstack(gcResetMarkState)
@@ -1751,6 +1751,7 @@ func gcMarkTermination(nextTriggerRatio float64) {
 	// Print gctrace before dropping worldsema. As soon as we drop
 	// worldsema another cycle could start and smash the stats
 	// we're trying to print.
+	// 持有全局锁的时候打印GC trace，以防释放锁时，其他gc生命周期执行结束
 	if debug.gctrace > 0 {
 		util := int(memstats.gc_cpu_fraction * 100)
 

@@ -19,6 +19,13 @@ package runtime
 // When the hashtable grows, we allocate a new array
 // of buckets twice as big. Buckets are incrementally
 // copied from the old bucket array to the new bucket array.
+// 当hash表扩容时，我们分配一个新两倍大的数组。旧桶被复制到新桶中。
+//
+// Map迭代器遍历一组桶并返回相应的顺序（桶->扩展顺序->桶的其他索引）
+// 对于持续迭代，我们从不移动buckets中的keys（如果移动了的话，key可能
+// 返回0或2次）。当扩容时如果桶被标记为‘被搬移’到新table中时，
+//迭代剩余的通过old table并且必须检查new table 。
+//
 //
 // Map iterators walk through the array of buckets and
 // return the keys in walk order (bucket #, then overflow
@@ -30,6 +37,7 @@ package runtime
 // they are iterating through has been moved ("evacuated")
 // to the new table.
 
+// 选取加载因子：
 // Picking loadFactor: too large and we have lots of overflow
 // buckets, too small and we waste a lot of space. I wrote
 // a simple program to check some stats for different loads:
@@ -63,7 +71,7 @@ import (
 const (
 	// Maximum number of key/elem pairs a bucket can hold.
 	bucketCntBits = 3
-	bucketCnt     = 1 << bucketCntBits
+	bucketCnt     = 1 << bucketCntBits // default 8
 
 	// Maximum average load of a bucket that triggers growth is 6.5.
 	// Represent as loadFactorNum/loadFactDen, to allow integer math.
@@ -115,9 +123,9 @@ func isEmpty(x uint8) bool {
 type hmap struct {
 	// Note: the format of the hmap is also encoded in cmd/compile/internal/gc/reflect.go.
 	// Make sure this stays in sync with the compiler's definition.
-	count     int // # live cells == size of map.  Must be first (used by len() builtin)
-	flags     uint8
-	B         uint8  // log_2 of # of buckets (can hold up to loadFactor * 2^B items)
+	count     int    // # live cells == size of map.  Must be first (used by len() builtin)
+	flags     uint8  // 表示map的状态 iterator, oldIterator,hashWriting,sameSizeGrow
+	B         uint8  // log_2 of # of buckets (can hold up to loadFactor * 2^B items) 2的B次方个buckest
 	noverflow uint16 // approximate number of overflow buckets; see incrnoverflow for details
 	hash0     uint32 // hash seed
 
@@ -132,12 +140,16 @@ type hmap struct {
 type mapextra struct {
 	// If both key and elem do not contain pointers and are inline, then we mark bucket
 	// type as containing no pointers. This avoids scanning such maps.
+	// 如果key和value不包含指针并且为内联时，那么我们标记bucket类型为不包含指针。这样就避免了扫描整个maps。
 	// However, bmap.overflow is a pointer. In order to keep overflow buckets
 	// alive, we store pointers to all overflow buckets in hmap.extra.overflow and hmap.extra.oldoverflow.
+	// 然后 overflow是一个指针，为了去保证buckets存活，我们存储指针到overflowbuckets到hmap.extra.overflow中。
 	// overflow and oldoverflow are only used if key and elem do not contain pointers.
+	// 二者仅用于key和value不包含指针。
 	// overflow contains overflow buckets for hmap.buckets.
 	// oldoverflow contains overflow buckets for hmap.oldbuckets.
 	// The indirection allows to store a pointer to the slice in hiter.
+	// TODO ???
 	overflow    *[]*bmap
 	oldoverflow *[]*bmap
 
@@ -185,6 +197,7 @@ func bucketShift(b uint8) uintptr {
 	return uintptr(1) << (b & (sys.PtrSize*8 - 1))
 }
 
+// 10000 -> 01111
 // bucketMask returns 1<<b - 1, optimized for code generation.
 func bucketMask(b uint8) uintptr {
 	return bucketShift(b) - 1
@@ -295,6 +308,7 @@ func makemap_small() *hmap {
 	return h
 }
 
+// 首先会在栈上创建map 或 第一个buckte
 // makemap implements Go map creation for make(map[k]v, hint).
 // If the compiler has determined that the map or the first bucket
 // can be created on the stack, h and/or bucket may be non-nil.

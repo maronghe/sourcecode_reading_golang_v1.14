@@ -15,6 +15,7 @@ import (
 	"time"
 )
 
+//Go网络通信的文件描述符，基于netFD的封装
 // Network file descriptor.
 type netFD struct {
 	pfd poll.FD
